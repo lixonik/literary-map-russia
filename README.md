@@ -30,7 +30,7 @@ On Windows, activate the virtual environment with `.venv\Scripts\activate` and c
 
 The site opens at http://127.0.0.1:8000/, the admin at http://127.0.0.1:8000/admin/.
 
-`migrate` creates 10 authors and grades 1 to 11 right away, so the site is not empty afterwards.
+`migrate` creates 12 authors and grades 1 to 11 right away, so the site is not empty afterwards.
 
 Put a secret key into `.env`. You can generate one like this:
 
@@ -111,7 +111,7 @@ static/       styles, grade filter script, map outline, logo
   - `media/` is public: portraits, lesson-plan files, worksheets. In development Django serves it at `/media/`, on a server it can be published directly;
   - `protected/` is private: uploaded audio and video. They are served only through the application: `/materials/<id>/` for playback (with HTTP Range support, without which Safari does not play video) and `/materials/<id>/download/` for downloads after signing in. Do not publish `protected/` through the web server, otherwise the download restriction can be bypassed.
 - The download restriction is enforced by the interface and by permissions on the download link. A file that the browser plays can technically be saved with third-party tools. Only encrypted streaming (DRM) gives full protection, which is excessive for an educational site.
-- Authors' dates and birthplaces were checked against the Russian Wikipedia. The links to grades 5 and 6 come from the federal working program for literature (the "Literature of the peoples of the Russian Federation" section). No authors are assigned to other grades yet.
+- Authors' dates and birthplaces were checked against the Russian Wikipedia. The links between authors and grades come from the topic distribution provided by the client; for grades 5 and 6 they match the federal working program for literature. Grades 1-3 have no authors (according to the distribution, folklore is studied there), and grades 7-9 are not in the distribution at all.
 - Map points were taken from the original mockup and placed schematically so that labels do not overlap. Some points are geographically off (Karim, Shestalov, Tukay and Aigi the most). Aitmatov was born outside Russia, so his point is placed on Moscow, where he studied at the Higher Literary Courses in 1956-1958. Coordinates can be edited in the admin.
 - The Russia outline is built from [Natural Earth](https://www.naturalearthdata.com/) data (public domain).
 - For deployment: `DJANGO_DEBUG=0`, your own `DJANGO_SECRET_KEY`, the domain in `DJANGO_ALLOWED_HOSTS`, then `python manage.py collectstatic`.

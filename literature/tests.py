@@ -53,9 +53,9 @@ class HomePageTests(TestCase):
     def test_renders_map_points_and_author_cards(self):
         response = self.client.get(reverse('home'))
 
-        self.assertContains(response, 'class="map__point', count=10)
-        self.assertContains(response, 'class="author-card"', count=10)
-        self.assertContains(response, '10 авторов · 10 литературных регионов')
+        self.assertContains(response, 'class="map__point', count=12)
+        self.assertContains(response, 'class="author-card"', count=12)
+        self.assertContains(response, '12 авторов · 11 литературных регионов')
 
     def test_map_coordinates_are_not_localized(self):
         response = self.client.get(reverse('home'))
@@ -65,8 +65,50 @@ class HomePageTests(TestCase):
     def test_points_carry_grades_for_filter(self):
         response = self.client.get(reverse('home'))
 
-        self.assertContains(response, 'data-grades="5 6"')
+        self.assertContains(response, 'data-grades="4 5 6 11"')
         self.assertContains(response, 'data-grade="11"')
+
+
+class DistributionTests(TestCase):
+    def grades_of(self, slug):
+        return list(Author.objects.get(slug=slug).grades.values_list('number', flat=True))
+
+    def test_authors_follow_client_distribution(self):
+        expected = {
+            'gamzatov': [4, 5, 6, 11],
+            'karim': [5, 6, 11],
+            'kuliev': [6, 11],
+            'tukay': [6, 10],
+            'akmulla': [10],
+            'khetagurov': [10],
+            'aigi': [11],
+            'aitmatov': [11],
+            'jalil': [11],
+            'kugultinov': [11],
+            'rytkeu': [11],
+            'shestalov': [11],
+        }
+
+        self.assertEqual({slug: self.grades_of(slug) for slug in expected}, expected)
+
+    def test_program_works_are_listed(self):
+        for slug, title in (('aitmatov', 'Белый пароход'), ('tukay', 'Книга'), ('kuliev', 'Что б ни делалось на свете…')):
+            with self.subTest(slug=slug):
+                self.assertTrue(Author.objects.get(slug=slug).works.filter(title=title).exists())
+
+    def test_new_authors_are_on_map_with_pages(self):
+        for slug, full_name in (('akmulla', 'Камалетдинов Мифтахетдин Камалетдинович'), ('khetagurov', 'Хетагуров Коста Леванович')):
+            author = Author.objects.get(slug=slug)
+            response = self.client.get(author.get_absolute_url())
+            with self.subTest(slug=slug):
+                self.assertTrue(author.on_map)
+                self.assertContains(response, full_name)
+                self.assertContains(response, '10 класс')
+
+    def test_grade_ten_lists_three_authors(self):
+        tenth = Author.objects.filter(grades__number=10).order_by('slug').values_list('slug', flat=True)
+
+        self.assertEqual(list(tenth), ['akmulla', 'khetagurov', 'tukay'])
 
 
 class FaviconTests(TestCase):
