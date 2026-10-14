@@ -1,24 +1,60 @@
+import io
 import shutil
 import tempfile
+from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
+from PIL import Image
 
 from .media import parse_range
-from .models import Author, Material
+from .models import Author, Material, Worksheet
+from .vk import normalize_vk_embed
 
 AUDIO_BYTES = bytes(range(256)) * 4
+VK_IFRAME = (
+    '<iframe src="https://vkvideo.ru/video_ext.php?oid=-22822305&amp;id=456241864&amp;hash=e037414127166efe&amp;hd=2" '
+    'width="853" height="480" allow="autoplay; encrypted-media; fullscreen; picture-in-picture;" '
+    'frameborder="0" allowfullscreen></iframe>'
+)
+VK_EMBED_URL = 'https://vkvideo.ru/video_ext.php?oid=-22822305&id=456241864&hash=e037414127166efe'
+
+
+def png_upload(name='image.png'):
+    buffer = io.BytesIO()
+    Image.new('RGB', (30, 40), '#7d97bd').save(buffer, format='PNG')
+    return SimpleUploadedFile(name, buffer.getvalue(), content_type='image/png')
+
+
+class TemporaryMediaMixin:
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.media_dir = tempfile.mkdtemp()
+        cls.media_override = override_settings(
+            MEDIA_ROOT=Path(cls.media_dir) / 'media',
+            PROTECTED_MEDIA_ROOT=Path(cls.media_dir) / 'protected',
+        )
+        cls.media_override.enable()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.media_override.disable()
+        shutil.rmtree(cls.media_dir, ignore_errors=True)
+        super().tearDownClass()
 
 
 class HomePageTests(TestCase):
     def test_renders_map_points_and_author_cards(self):
         response = self.client.get(reverse('home'))
 
-        self.assertContains(response, 'class="map__point', count=9)
+        self.assertContains(response, 'class="map__point', count=10)
         self.assertContains(response, 'class="author-card"', count=10)
-        self.assertContains(response, '9 авторов · 9 литературных регионов')
+        self.assertContains(response, '10 авторов · 10 литературных регионов')
 
     def test_map_coordinates_are_not_localized(self):
         response = self.client.get(reverse('home'))
@@ -32,6 +68,15 @@ class HomePageTests(TestCase):
         self.assertContains(response, 'data-grade="11"')
 
 
+class AitmatovPlacementTests(TestCase):
+    def test_marked_in_moscow(self):
+        aitmatov = Author.objects.get(slug='aitmatov')
+
+        self.assertTrue(aitmatov.on_map)
+        self.assertEqual(aitmatov.region, 'Кыргызстан · жил в Москве')
+        self.assertIn('Высших литературных курсах', aitmatov.biography)
+
+
 class AuthorPageTests(TestCase):
     def test_shows_required_facts(self):
         response = self.client.get(reverse('author', kwargs={'slug': 'gamzatov'}))
@@ -40,7 +85,8 @@ class AuthorPageTests(TestCase):
         self.assertContains(response, '8 сентября 1923 — 3 ноября 2003')
         self.assertContains(response, 'село Цада, Дагестанская АССР')
         self.assertContains(response, '«Журавли»')
-        self.assertContains(response, 'Текст разработки готовится')
+        self.assertContains(response, 'Разработка готовится')
+        self.assertContains(response, 'Рабочие листы к разработке пока не добавлены.')
 
     def test_methodology_text_replaces_placeholder(self):
         Author.objects.filter(slug='tukay').update(methodology='Цель занятия.\n\nХод урока.')
@@ -48,7 +94,7 @@ class AuthorPageTests(TestCase):
         response = self.client.get(reverse('author', kwargs={'slug': 'tukay'}))
 
         self.assertContains(response, '<p>Цель занятия.</p>', html=True)
-        self.assertNotContains(response, 'Текст разработки готовится')
+        self.assertNotContains(response, 'Разработка готовится')
 
     def test_unknown_author_returns_404(self):
         response = self.client.get(reverse('author', kwargs={'slug': 'unknown'}))
@@ -56,7 +102,51 @@ class AuthorPageTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
-class ParseRangeTests(TestCase):
+class AuthorAttachmentsTests(TemporaryMediaMixin, TestCase):
+    def setUp(self):
+        self.author = Author.objects.get(slug='karim')
+        self.url = reverse('author', kwargs={'slug': 'karim'})
+
+    def test_shows_portrait(self):
+        self.author.portrait = png_upload('karim.png')
+        self.author.save()
+
+        response = self.client.get(self.url)
+
+        self.assertContains(response, 'author-hero--with-portrait')
+        self.assertContains(response, f'src="{self.author.portrait.url}"')
+
+    def test_methodology_file_is_open_to_everyone(self):
+        self.author.methodology_file = SimpleUploadedFile('lesson.pdf', b'%PDF-1.4 test', content_type='application/pdf')
+        self.author.save()
+
+        response = self.client.get(self.url)
+
+        self.assertContains(response, f'href="{self.author.methodology_file.url}"')
+        self.assertContains(response, 'Файл методической разработки')
+        self.assertNotContains(response, 'Разработка готовится')
+
+    def test_worksheets_are_listed(self):
+        worksheet = Worksheet.objects.create(author=self.author, title='Лист 1', image=png_upload('sheet.png'))
+
+        response = self.client.get(self.url)
+
+        self.assertContains(response, f'href="{worksheet.image.url}"')
+        self.assertContains(response, 'Лист 1')
+        self.assertNotContains(response, 'Рабочие листы к разработке пока не добавлены.')
+
+    def test_deleting_author_removes_files(self):
+        self.author.portrait = png_upload('karim.png')
+        self.author.save()
+        worksheet = Worksheet.objects.create(author=self.author, image=png_upload('sheet.png'))
+        storage, names = self.author.portrait.storage, [self.author.portrait.name, worksheet.image.name]
+
+        self.author.delete()
+
+        self.assertFalse(any(storage.exists(name) for name in names))
+
+
+class ParseRangeTests(SimpleTestCase):
     def test_parses_open_ended_and_suffix_ranges(self):
         self.assertEqual(parse_range('bytes=0-1', 100), (0, 1))
         self.assertEqual(parse_range('bytes=10-', 100), (10, 99))
@@ -69,20 +159,82 @@ class ParseRangeTests(TestCase):
         self.assertIsNone(parse_range('items=0-1', 100))
 
 
-class MaterialAccessTests(TestCase):
-    @classmethod
-    def setUpClass(cls):
-        super().setUpClass()
-        cls.media_root = tempfile.mkdtemp()
-        cls.settings_override = override_settings(MEDIA_ROOT=cls.media_root)
-        cls.settings_override.enable()
+class VkEmbedTests(SimpleTestCase):
+    def test_accepts_embed_code_and_player_url(self):
+        self.assertEqual(normalize_vk_embed(VK_IFRAME), VK_EMBED_URL)
+        self.assertEqual(normalize_vk_embed(VK_EMBED_URL.replace('vkvideo.ru', 'www.vk.com')), VK_EMBED_URL.replace('vkvideo.ru', 'vk.com'))
 
-    @classmethod
-    def tearDownClass(cls):
-        cls.settings_override.disable()
-        shutil.rmtree(cls.media_root, ignore_errors=True)
-        super().tearDownClass()
+    def test_accepts_page_links_and_codes_without_access_key(self):
+        player = 'https://vk.ru/video_ext.php?oid=-22822305&id=456241864'
 
+        for value in (
+            'https://vkvideo.ru/video-22822305_456241864',
+            'https://vk.com/video-22822305_456241864?list=ln-abc',
+            'https://vk.com/videos-22822305?z=video-22822305_456241864%2Fpl_-22822305_-2',
+            '<iframe src="https://vk.ru/video_ext.php?oid=-22822305&id=456241864&hd=2"></iframe>',
+        ):
+            with self.subTest(value=value):
+                self.assertEqual(normalize_vk_embed(value), player)
+
+    def test_rejects_foreign_hosts_schemes_and_non_video_pages(self):
+        for value in (
+            VK_EMBED_URL.replace('vkvideo.ru', 'evil.example'),
+            VK_EMBED_URL.replace('https', 'javascript'),
+            '<iframe src="https://youtube.com/embed/abc"></iframe>',
+            'https://vk.com/club22822305',
+            'https://vk.ru/video_ext.php?oid=abc&id=1',
+        ):
+            with self.subTest(value=value), self.assertRaises(ValidationError):
+                normalize_vk_embed(value)
+
+
+class MaterialValidationTests(TestCase):
+    def setUp(self):
+        self.author = Author.objects.get(slug='gamzatov')
+
+    def test_requires_exactly_one_source(self):
+        empty = Material(author=self.author, title='Пусто')
+        both = Material(
+            author=self.author,
+            title='Оба',
+            vk_video=VK_IFRAME,
+            file=SimpleUploadedFile('a.mp3', AUDIO_BYTES, content_type='audio/mpeg'),
+        )
+
+        for material in (empty, both):
+            with self.subTest(title=material.title), self.assertRaises(ValidationError):
+                material.full_clean()
+
+    def test_normalizes_vk_embed_code(self):
+        material = Material(author=self.author, title='Чтение', vk_video=VK_IFRAME)
+
+        material.full_clean()
+
+        self.assertEqual(material.vk_video, VK_EMBED_URL)
+
+
+class VkMaterialPageTests(TestCase):
+    def setUp(self):
+        self.material = Material.objects.create(
+            author=Author.objects.get(slug='gamzatov'), title='Журавли', vk_video=VK_EMBED_URL
+        )
+
+    def test_renders_vk_player_without_download(self):
+        response = self.client.get(reverse('author', kwargs={'slug': 'gamzatov'}))
+
+        self.assertContains(response, '<iframe src="https://vkvideo.ru/video_ext.php?oid=-22822305&amp;id=456241864')
+        self.assertNotContains(response, 'Скачивание доступно после')
+        self.assertNotContains(response, reverse('material-download', kwargs={'pk': self.material.pk}))
+
+    def test_stream_and_download_return_404(self):
+        self.client.force_login(get_user_model().objects.create_user('r@example.com', 'test-pass-123', full_name='Р'))
+
+        for name in ('material-stream', 'material-download'):
+            response = self.client.get(reverse(name, kwargs={'pk': self.material.pk}))
+            self.assertEqual(response.status_code, 404)
+
+
+class MaterialAccessTests(TemporaryMediaMixin, TestCase):
     def setUp(self):
         self.material = Material.objects.create(
             author=Author.objects.get(slug='gamzatov'),
@@ -91,6 +243,14 @@ class MaterialAccessTests(TestCase):
         )
         self.stream_url = reverse('material-stream', kwargs={'pk': self.material.pk})
         self.download_url = reverse('material-download', kwargs={'pk': self.material.pk})
+
+    def test_file_is_stored_outside_public_media(self):
+        stored = Path(self.material.file.path)
+
+        self.assertTrue(stored.is_relative_to(settings.PROTECTED_MEDIA_ROOT))
+        self.assertFalse(stored.is_relative_to(settings.MEDIA_ROOT))
+        with self.assertRaises(ValueError):
+            self.material.file.url
 
     def test_anyone_can_stream(self):
         response = self.client.get(self.stream_url)
@@ -128,9 +288,7 @@ class MaterialAccessTests(TestCase):
         self.assertEqual(b''.join(response.streaming_content), AUDIO_BYTES)
 
     def test_author_page_hides_download_link_for_anonymous(self):
-        author_url = reverse('author', kwargs={'slug': 'gamzatov'})
-
-        response = self.client.get(author_url)
+        response = self.client.get(reverse('author', kwargs={'slug': 'gamzatov'}))
 
         self.assertContains(response, self.stream_url)
         self.assertNotContains(response, self.download_url)

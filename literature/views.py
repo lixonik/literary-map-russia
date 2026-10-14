@@ -19,19 +19,21 @@ def home(request):
 
 
 def author_detail(request, slug):
-    author = get_object_or_404(Author.objects.prefetch_related('works', 'materials', 'grades'), slug=slug)
+    author = get_object_or_404(
+        Author.objects.prefetch_related('works', 'worksheets', 'materials', 'grades'), slug=slug
+    )
     other_authors = Author.objects.exclude(pk=author.pk).only('slug', 'name')
     return render(request, 'literature/author_detail.html', {'author': author, 'other_authors': other_authors})
 
 
 def material_stream(request, pk):
-    material = get_object_or_404(Material, pk=pk)
+    material = get_object_or_404(Material.objects.exclude(file=''), pk=pk)
     return ranged_file_response(request, material.file, material.content_type)
 
 
 @login_required
 def material_download(request, pk):
-    material = get_object_or_404(Material, pk=pk)
+    material = get_object_or_404(Material.objects.exclude(file=''), pk=pk)
     return FileResponse(
         open_or_404(material.file),
         as_attachment=True,

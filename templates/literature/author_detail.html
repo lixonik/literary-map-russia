@@ -4,10 +4,15 @@
 <main class="page author-page">
   <a class="back-link" href="{% url 'home' %}#authors">← Вернуться к карте</a>
 
-  <section class="author-hero">
-    <div class="eyebrow">{{ author.region }}</div>
-    <h1>{{ author.name }}</h1>
-    <p class="author-hero__summary">{{ author.summary }}</p>
+  <section class="author-hero{% if author.portrait %} author-hero--with-portrait{% endif %}">
+    <div class="author-hero__intro">
+      <div class="eyebrow">{{ author.region }}</div>
+      <h1>{{ author.name }}</h1>
+      <p class="author-hero__summary">{{ author.summary }}</p>
+    </div>
+    {% if author.portrait %}
+      <img class="author-hero__portrait" src="{{ author.portrait.url }}" alt="Портрет: {{ author.name }}">
+    {% endif %}
     <dl class="facts">
       <div><dt>ФИО</dt><dd>{{ author.full_name }}</dd></div>
       <div>
@@ -62,9 +67,20 @@
       <div class="prose">
         {% if author.methodology %}
           {{ author.methodology|linebreaks }}
-        {% else %}
+        {% endif %}
+        {% if author.methodology_file %}
+          <a class="file-card" href="{{ author.methodology_file.url }}" target="_blank" rel="noopener">
+            <span class="file-card__type">{{ author.methodology_file_extension }}</span>
+            <span class="file-card__body">
+              <strong>Файл методической разработки</strong>
+              {% with size=author.methodology_file_size %}{% if size %}<small>{{ size|filesizeformat }}</small>{% endif %}{% endwith %}
+            </span>
+            <span class="file-card__arrow" aria-hidden="true">↗</span>
+          </a>
+        {% endif %}
+        {% if not author.methodology and not author.methodology_file %}
           <div class="placeholder">
-            <h3>Текст разработки готовится</h3>
+            <h3>Разработка готовится</h3>
             <p>Здесь появится методическая разработка занятия по творчеству автора: цели, ход урока, вопросы для обсуждения и задания.</p>
           </div>
         {% endif %}
@@ -77,6 +93,28 @@
       {% endif %}
     </div>
 
+    <div class="worksheets" id="worksheets">
+      <h3>Рабочие листы</h3>
+      {% with worksheets=author.worksheets.all %}
+        {% if worksheets %}
+          <div class="worksheet-grid">
+            {% for worksheet in worksheets %}
+              <figure class="worksheet">
+                <a href="{{ worksheet.image.url }}" target="_blank" rel="noopener">
+                  <img src="{{ worksheet.image.url }}" alt="{{ worksheet.title|default:'Рабочий лист' }}" loading="lazy">
+                </a>
+                {% if worksheet.title %}<figcaption>{{ worksheet.title }}</figcaption>{% endif %}
+              </figure>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="placeholder">
+            <p>Рабочие листы к разработке пока не добавлены.</p>
+          </div>
+        {% endif %}
+      {% endwith %}
+    </div>
+
     <div class="materials" id="materials">
       <h3>Аудио и видео</h3>
       {% with materials=author.materials.all %}
@@ -84,7 +122,9 @@
           <div class="material-grid">
             {% for material in materials %}
               <figure class="material">
-                {% if material.is_video %}
+                {% if material.is_vk %}
+                  <iframe src="{{ material.vk_video }}" title="{{ material.title }}" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; screen-wake-lock" allowfullscreen loading="lazy"></iframe>
+                {% elif material.is_video %}
                   <video controls playsinline preload="metadata" controlslist="nodownload" src="{% url 'material-stream' material.pk %}"></video>
                 {% else %}
                   <audio controls preload="metadata" controlslist="nodownload" src="{% url 'material-stream' material.pk %}"></audio>
@@ -92,10 +132,12 @@
                 <figcaption>
                   <strong>{{ material.title }}</strong>
                   {% if material.description %}<p>{{ material.description }}</p>{% endif %}
-                  {% if user.is_authenticated %}
-                    <a class="button-link button-link--small" href="{% url 'material-download' material.pk %}">Скачать <span aria-hidden="true">↓</span></a>
-                  {% else %}
-                    <p class="material__note">Скачивание доступно после <a href="{% url 'login' %}?next={{ request.path|urlencode }}%23materials">входа</a> или <a href="{% url 'register' %}?next={{ request.path|urlencode }}%23materials">регистрации</a>.</p>
+                  {% if material.file %}
+                    {% if user.is_authenticated %}
+                      <a class="button-link button-link--small" href="{% url 'material-download' material.pk %}">Скачать <span aria-hidden="true">↓</span></a>
+                    {% else %}
+                      <p class="material__note">Скачивание доступно после <a href="{% url 'login' %}?next={{ request.path|urlencode }}%23materials">входа</a> или <a href="{% url 'register' %}?next={{ request.path|urlencode }}%23materials">регистрации</a>.</p>
+                    {% endif %}
                   {% endif %}
                 </figcaption>
               </figure>

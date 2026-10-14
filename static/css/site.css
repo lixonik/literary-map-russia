@@ -678,6 +678,25 @@ textarea {
   line-height: 1.8;
 }
 
+.author-hero--with-portrait {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  column-gap: 40px;
+  align-items: start;
+}
+
+.author-hero--with-portrait .facts {
+  grid-column: 1 / -1;
+}
+
+.author-hero__portrait {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: 18px;
+  background: var(--surface);
+}
+
 .facts {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -790,11 +809,59 @@ textarea {
   line-height: 1.7;
 }
 
+.file-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  color: var(--text);
+  transition: border-color .2s ease;
+}
+
+.file-card:hover {
+  border-color: #9aacc7;
+  color: var(--text);
+}
+
+.file-card__type {
+  min-width: 52px;
+  padding: 10px 8px;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--accent-text);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.file-card__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  font-size: 14px;
+}
+
+.file-card__body small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.file-card__arrow {
+  color: var(--accent-text);
+  font-size: 18px;
+}
+
+.worksheets,
 .materials {
   margin-top: 36px;
   scroll-margin-top: 30px;
 }
 
+.worksheets > h3,
 .materials > h3 {
   margin-bottom: 16px;
   font-size: 22px;
@@ -814,9 +881,44 @@ textarea {
   border-radius: 18px;
 }
 
-.material video {
+.worksheet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
+  gap: 16px;
+}
+
+.worksheet a {
+  display: block;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-soft);
+  transition: border-color .2s ease;
+}
+
+.worksheet a:hover {
+  border-color: #9aacc7;
+}
+
+.worksheet img {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+}
+
+.worksheet figcaption {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.material video,
+.material iframe {
+  display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
+  border: 0;
   border-radius: 12px;
   background: #000;
 }
@@ -997,6 +1099,16 @@ textarea {
   .site-header__inner {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .author-hero--with-portrait {
+    grid-template-columns: 1fr;
+  }
+
+  .author-hero__portrait {
+    grid-row: 1;
+    max-width: 200px;
+    margin-bottom: 20px;
   }
 
   .site-nav {

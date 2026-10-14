@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib import admin
 
-from .models import Author, Material, Work
+from .models import Author, Material, Work, Worksheet
 
 admin.site.site_header = 'Литературная карта народов России'
 admin.site.site_title = 'Литературная карта'
@@ -13,9 +13,16 @@ class WorkInline(admin.TabularInline):
     extra = 1
 
 
+class WorksheetInline(admin.TabularInline):
+    model = Worksheet
+    extra = 0
+    fields = ('image', 'title', 'position')
+
+
 class MaterialInline(admin.StackedInline):
     model = Material
     extra = 0
+    fields = ('title', 'description', 'file', 'vk_video', 'position')
 
 
 @admin.register(Author)
@@ -25,13 +32,13 @@ class AuthorAdmin(admin.ModelAdmin):
     list_filter = ('grades',)
     search_fields = ('name', 'full_name', 'region')
     prepopulated_fields = {'slug': ('name',)}
-    inlines = (WorkInline, MaterialInline)
+    inlines = (WorkInline, WorksheetInline, MaterialInline)
     fieldsets = (
-        (None, {'fields': ('name', 'slug', 'full_name', 'summary', 'position')}),
+        (None, {'fields': ('name', 'slug', 'full_name', 'summary', 'portrait', 'position')}),
         ('Биография', {'fields': (
             'birth_date', 'death_date', 'birth_place', 'region', 'tradition', 'biography', 'significance',
         )}),
-        ('Методическая разработка', {'fields': ('methodology', 'research_question', 'grades')}),
+        ('Методическая разработка', {'fields': ('methodology', 'methodology_file', 'research_question', 'grades')}),
         ('Карта', {'fields': ('map_label', 'map_x', 'map_y', 'map_label_side')}),
     )
 
