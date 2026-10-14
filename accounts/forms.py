@@ -1,7 +1,19 @@
 from django import forms
-from django.contrib.auth.forms import AdminUserCreationForm, BaseUserCreationForm, UserChangeForm
+from django.contrib.auth.forms import (
+    AdminUserCreationForm,
+    AuthenticationForm,
+    BaseUserCreationForm,
+    UserChangeForm,
+)
 
 from .models import User
+
+
+class EmailAuthenticationForm(AuthenticationForm):
+    error_messages = {
+        **AuthenticationForm.error_messages,
+        'invalid_login': 'Неверная электронная почта или пароль.',
+    }
 
 
 class RegistrationForm(BaseUserCreationForm):

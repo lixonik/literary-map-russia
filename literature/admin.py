@@ -35,6 +35,11 @@ class AuthorAdmin(admin.ModelAdmin):
         ('Карта', {'fields': ('map_label', 'map_x', 'map_y', 'map_label_side')}),
     )
 
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name in ('map_x', 'map_y'):
+            kwargs['localize'] = True
+        return super().formfield_for_dbfield(db_field, request, **kwargs)
+
     def formfield_for_manytomany(self, db_field, request, **kwargs):
         if db_field.name == 'grades':
             kwargs['widget'] = forms.CheckboxSelectMultiple

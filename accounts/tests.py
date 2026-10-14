@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -69,6 +71,22 @@ class LoginTests(TestCase):
 
         self.assertRedirects(response, reverse('home'))
 
+    def test_wrong_password_shows_readable_error(self):
+        response = self.client.post(reverse('login'), {'username': 'teacher@example.com', 'password': 'wrong'})
+
+        self.assertContains(response, 'Неверная электронная почта или пароль.')
+
+    def test_header_login_link_is_not_nested_on_auth_pages(self):
+        for name in ('login', 'register'):
+            response = self.client.get(reverse(name))
+
+            self.assertContains(response, f'class="pill" href="{reverse("login")}"')
+
+    def test_header_login_link_returns_to_current_page(self):
+        response = self.client.get(reverse('author', kwargs={'slug': 'tukay'}))
+
+        self.assertContains(response, f'href="{reverse("login")}?next=/authors/tukay/"')
+
     def test_logout_requires_post(self):
         self.client.login(username='teacher@example.com', password='long-unique-pass-42')
 
@@ -93,3 +111,13 @@ class AdminTests(TestCase):
 
         for response in (author, author_change, user_add, user_change):
             self.assertEqual(response.status_code, 200)
+
+    def test_map_coordinates_accept_comma_and_dot(self):
+        response = self.client.get(
+            reverse('admin:literature_author_change', args=[Author.objects.get(slug='gamzatov').pk])
+        )
+        map_x = response.context['adminform'].form.fields['map_x']
+
+        self.assertEqual(map_x.clean('18,5'), Decimal('18.5'))
+        self.assertEqual(map_x.clean('18.5'), Decimal('18.5'))
+        self.assertContains(response, 'name="map_x" value="18,73"')

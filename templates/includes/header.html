@@ -17,7 +17,9 @@
           <button class="pill" type="submit">Выйти</button>
         </form>
       {% else %}
-        <a class="pill" href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Войти</a>
+        {% with page=request.resolver_match.url_name %}
+          <a class="pill" href="{% url 'login' %}{% if page != 'login' and page != 'register' %}?next={{ request.get_full_path|urlencode }}{% endif %}">Войти</a>
+        {% endwith %}
       {% endif %}
     </nav>
   </div>
