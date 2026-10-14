@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Вход — Литературная карта народов России{% endblock %}
+{% block content %}
+<main class="page auth-page">
+  <section class="auth-card">
+    <img class="auth-card__logo" src="{% static 'img/flag.svg' %}" alt="" width="20" height="31">
+    <h1>Вход</h1>
+    <p class="auth-card__lead">Войдите, чтобы скачивать аудио- и видеоматериалы методических разработок.</p>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      {% include 'includes/form_fields.html' %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <button class="button" type="submit">Войти</button>
+    </form>
+    <p class="auth-card__alt">Нет аккаунта? <a href="{% url 'register' %}{% if next %}?next={{ next|urlencode }}{% endif %}">Зарегистрироваться</a></p>
+  </section>
+</main>
+{% endblock %}

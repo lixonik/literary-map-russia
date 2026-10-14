@@ -1,0 +1,24 @@
+{% load static %}
+<header class="site-header">
+  <div class="site-header__inner">
+    <a class="brand" href="{% url 'home' %}">
+      <span class="brand__symbol"><img src="{% static 'img/flag.svg' %}" alt="" width="12" height="18"></span>
+      <span class="brand__words">Литературная карта<small>народов России</small></span>
+    </a>
+    <nav class="site-nav" aria-label="Главная навигация">
+      <a href="{% url 'home' %}#map">Карта</a>
+      <a href="{% url 'home' %}#authors">Авторы</a>
+      <a href="{% url 'home' %}#methodics">Методический конструктор</a>
+      <a href="{% url 'home' %}#media">Медиатека</a>
+      <a href="{% url 'home' %}#projects-bank">Банк проектов</a>
+      {% if user.is_authenticated %}
+        <form method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button class="pill" type="submit">Выйти</button>
+        </form>
+      {% else %}
+        <a class="pill" href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Войти</a>
+      {% endif %}
+    </nav>
+  </div>
+</header>

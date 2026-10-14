@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% load static l10n literature_extras %}
+{% block content %}
+<main class="page">
+  <section class="hero">
+    <div class="eyebrow">Цифровой методический навигатор</div>
+    <h1>Литературная карта<br><em>народов России</em></h1>
+    <p>Исследуйте, как литература разных народов рассказывает о родной земле, языке, памяти и культурных традициях. Ресурс для учителей-словесников, школьников и студентов-филологов.</p>
+    <a class="button-link" href="#map">Исследовать карту <span aria-hidden="true">↗</span></a>
+  </section>
+
+  <section class="section" id="map">
+    <div class="section__head">
+      <div>
+        <div class="eyebrow">Литературная география</div>
+        <h2>У каждой земли — своя литературная традиция</h2>
+      </div>
+      <p>Выберите автора на карте, чтобы открыть методическую разработку.</p>
+    </div>
+    <div class="map-card">
+      <div class="map">
+        <div class="map__canvas">
+          <img src="{% static 'img/russia.svg' %}" alt="Контур России с точками литературных регионов" width="1000" height="430">
+          {% for author in map_authors %}
+            <a class="map__point map__point--{{ author.map_label_side }}"
+               href="{{ author.get_absolute_url }}"
+               style="--x: {{ author.map_x|unlocalize }}%; --y: {{ author.map_y|unlocalize }}%"
+               data-grades="{% for grade in author.grades.all %}{{ grade.number }}{% if not forloop.last %} {% endif %}{% endfor %}"
+               aria-label="Открыть страницу автора: {{ author.name }}"><span>{{ author.map_label }}</span></a>
+          {% endfor %}
+        </div>
+      </div>
+      <aside class="map-card__aside">
+        <h3>Литературная карта России</h3>
+        <p>Основной раздел сайта. Здесь можно изучить авторов из школьной программы и познакомиться с литературным наследием разных народов России. Нажмите на голубую точку, чтобы открыть страницу автора.</p>
+        <div class="map-legend"><span class="map-legend__point"></span>Выберите автора на карте</div>
+        {% with authors_count=map_authors|length %}
+          <div class="map-summary" data-map-summary>{{ authors_count }} {{ authors_count|ru_plural:"автор,автора,авторов" }} · {{ map_regions_count }} {{ map_regions_count|ru_plural:"литературный регион,литературных региона,литературных регионов" }}</div>
+        {% endwith %}
+        <a class="map-card__all" href="#authors">Все авторы <span aria-hidden="true">↗</span></a>
+      </aside>
+    </div>
+  </section>
+
+  <section class="section section--authors" id="authors">
+    <div class="section__head">
+      <div>
+        <div class="eyebrow">Лица литературы</div>
+        <h2>Познакомьтесь с авторами</h2>
+      </div>
+      <p>Каждая литературная традиция — уникальный голос России.</p>
+    </div>
+    <div class="author-grid">
+      {% for author in authors %}
+        <a class="author-card" href="{{ author.get_absolute_url }}"
+           data-grades="{% for grade in author.grades.all %}{{ grade.number }}{% if not forloop.last %} {% endif %}{% endfor %}">
+          <div class="author-card__top">
+            <span>{{ author.region }}</span>
+            <span class="author-card__number">{{ forloop.counter|stringformat:"02d" }}</span>
+          </div>
+          <div class="author-card__body">
+            <div class="author-card__meta">Литература народов России</div>
+            <h3>{{ author.name }}</h3>
+            <p>{{ author.summary }}</p>
+            <span class="text-link">Открыть страницу автора <b aria-hidden="true">↗</b></span>
+          </div>
+        </a>
+      {% empty %}
+        <p>Авторы пока не добавлены.</p>
+      {% endfor %}
+    </div>
+    <p class="grade-empty" data-grade-empty hidden></p>
+  </section>
+
+  <section class="section section--padded" id="methodics">
+    <div class="section__head">
+      <div>
+        <div class="eyebrow">Инструменты преподавателя</div>
+        <h2>Методический конструктор</h2>
+      </div>
+      <p>Превращайте знакомство с автором в исследовательское занятие.</p>
+    </div>
+    <div class="resource-grid">
+      <article class="tile">
+        <span class="tile__mark">I</span>
+        <h3>Исследовать текст</h3>
+        <p>Вопросы для анализа художественных образов, темы родины, памяти, языка и культурных традиций.</p>
+        <a href="#authors">Выбрать автора ↗</a>
+      </article>
+      <article class="tile" id="media">
+        <span class="tile__mark">II</span>
+        <h3>Мультимедиатека</h3>
+        <p>Подборка отправных точек для занятия: чтение фрагментов, обсуждение контекста и самостоятельный поиск источников.</p>
+        <a href="#authors">Перейти к материалам ↗</a>
+      </article>
+      <article class="tile" id="projects-bank">
+        <span class="tile__mark">III</span>
+        <h3>Банк учебных проектов</h3>
+        <p>Идеи для индивидуальных и групповых работ: литературные маршруты, мини-исследования и цифровые выставки.</p>
+        <a href="#classroom-use">Сценарии использования ↗</a>
+      </article>
+    </div>
+  </section>
+
+  <section class="section section--padded" id="classroom-use">
+    <div class="section__head">
+      <div>
+        <div class="eyebrow">Школа и вуз</div>
+        <h2>Как использовать навигатор</h2>
+      </div>
+    </div>
+    <div class="use-case-grid">
+      <div class="tile">
+        <span class="tile__kicker">01 / ШКОЛА</span>
+        <h3>Урок и внеурочная работа</h3>
+        <p>Выберите регион и автора, обсудите связь произведения с культурой народа. Используйте разработку на разных этапах урока или предложите классу подготовить небольшой исследовательский проект.</p>
+      </div>
+      <div class="tile">
+        <span class="tile__kicker">02 / ВУЗ</span>
+        <h3>Практикум для филологов</h3>
+        <p>Используйте карту как основу для сравнительного анализа литературных традиций, проектирования занятия и методической разработки.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section grades" id="grades">
+    <div class="section__head">
+      <div>
+        <div class="eyebrow">Материалы для школьников</div>
+        <h2>Литература по классам</h2>
+      </div>
+      <p>Выберите класс, чтобы использовать фильтр на карте.</p>
+    </div>
+    <div class="grade-row" role="group" aria-label="Фильтр авторов по классам">
+      {% for grade in grades %}
+        <button type="button" class="grade-chip" data-grade="{{ grade.number }}" aria-pressed="false">{{ grade.number }}</button>
+      {% endfor %}
+      <button type="button" class="grade-reset" data-grade-reset hidden>Показать всех авторов</button>
+    </div>
+  </section>
+</main>
+{% endblock %}
+{% block scripts %}
+  <script src="{% static 'js/grade-filter.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,95 @@
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.urls import reverse
+
+from literature.models import Author
+
+User = get_user_model()
+
+
+class RegistrationTests(TestCase):
+    def submit(self, **overrides):
+        data = {
+            'full_name': 'Иванова Анна Сергеевна',
+            'email': 'Anna@Example.com',
+            'workplace': 'Школа № 1',
+            'research_interests': 'Литература народов России',
+            'password1': 'long-unique-pass-42',
+            'password2': 'long-unique-pass-42',
+        }
+        data.update(overrides)
+        return self.client.post(reverse('register'), data)
+
+    def test_creates_user_with_profile_fields_and_logs_in(self):
+        response = self.submit()
+
+        self.assertRedirects(response, reverse('home'))
+        user = User.objects.get()
+        self.assertEqual(user.email, 'anna@example.com')
+        self.assertEqual(user.full_name, 'Иванова Анна Сергеевна')
+        self.assertEqual(user.workplace, 'Школа № 1')
+        self.assertEqual(user.research_interests, 'Литература народов России')
+        self.assertEqual(int(self.client.session['_auth_user_id']), user.pk)
+
+    def test_requires_workplace_and_interests(self):
+        response = self.submit(workplace='', research_interests='')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(User.objects.exists())
+        self.assertFormError(response.context['form'], 'workplace', 'Обязательное поле.')
+        self.assertFormError(response.context['form'], 'research_interests', 'Обязательное поле.')
+
+    def test_rejects_duplicate_email_case_insensitively(self):
+        User.objects.create_user('anna@example.com', 'other-pass-42', full_name='Анна')
+
+        response = self.submit(email='ANNA@example.com')
+
+        self.assertEqual(User.objects.count(), 1)
+        self.assertFormError(response.context['form'], 'email', 'Пользователь с такой почтой уже зарегистрирован.')
+
+    def test_redirects_to_safe_next_only(self):
+        author_url = reverse('author', kwargs={'slug': 'tukay'})
+
+        self.assertRedirects(self.submit(next=author_url), author_url)
+
+    def test_ignores_external_next(self):
+        response = self.submit(next='https://example.org/')
+
+        self.assertRedirects(response, reverse('home'))
+
+
+class LoginTests(TestCase):
+    def setUp(self):
+        User.objects.create_user('teacher@example.com', 'long-unique-pass-42', full_name='Учитель')
+
+    def test_login_by_email_ignores_case(self):
+        response = self.client.post(
+            reverse('login'), {'username': 'Teacher@Example.com', 'password': 'long-unique-pass-42'}
+        )
+
+        self.assertRedirects(response, reverse('home'))
+
+    def test_logout_requires_post(self):
+        self.client.login(username='teacher@example.com', password='long-unique-pass-42')
+
+        response = self.client.post(reverse('logout'))
+
+        self.assertRedirects(response, reverse('home'))
+        self.assertNotIn('_auth_user_id', self.client.session)
+
+
+class AdminTests(TestCase):
+    def setUp(self):
+        admin = User.objects.create_superuser('admin@example.com', 'long-unique-pass-42', full_name='Администратор')
+        self.client.force_login(admin)
+
+    def test_admin_pages_render(self):
+        author = self.client.get(reverse('admin:literature_author_changelist'))
+        author_change = self.client.get(
+            reverse('admin:literature_author_change', args=[Author.objects.get(slug='gamzatov').pk])
+        )
+        user_add = self.client.get(reverse('admin:accounts_user_add'))
+        user_change = self.client.get(reverse('admin:accounts_user_change', args=[User.objects.get().pk]))
+
+        for response in (author, author_change, user_add, user_change):
+            self.assertEqual(response.status_code, 200)

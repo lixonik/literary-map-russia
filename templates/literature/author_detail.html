@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block title %}{{ author.name }} — Литературная карта народов России{% endblock %}
+{% block content %}
+<main class="page author-page">
+  <a class="back-link" href="{% url 'home' %}#authors">← Вернуться к карте</a>
+
+  <section class="author-hero">
+    <div class="eyebrow">{{ author.region }}</div>
+    <h1>{{ author.name }}</h1>
+    <p class="author-hero__summary">{{ author.summary }}</p>
+    <dl class="facts">
+      <div><dt>ФИО</dt><dd>{{ author.full_name }}</dd></div>
+      <div>
+        <dt>Даты жизни</dt>
+        <dd>{{ author.birth_date|date:"j E Y" }}{% if author.death_date %} — {{ author.death_date|date:"j E Y" }}{% endif %}</dd>
+      </div>
+      <div><dt>Место рождения</dt><dd>{{ author.birth_place }}</dd></div>
+      <div><dt>Литературная традиция</dt><dd>{{ author.tradition }}</dd></div>
+    </dl>
+  </section>
+
+  <div class="two-columns author-layout">
+    <article class="prose">
+      <div class="eyebrow">Биография и творчество</div>
+      <h2>О писателе</h2>
+      {{ author.biography|linebreaks }}
+      {% if author.significance %}
+        <h2>Темы и значение творчества</h2>
+        {{ author.significance|linebreaks }}
+      {% endif %}
+    </article>
+    <aside class="side-card">
+      <span class="eyebrow">Что изучить</span>
+      <h3>Ключевые произведения</h3>
+      {% with works=author.works.all %}
+        {% if works %}
+          <ul>{% for work in works %}<li>«{{ work.title }}»</li>{% endfor %}</ul>
+        {% else %}
+          <p>Список произведений готовится.</p>
+        {% endif %}
+      {% endwith %}
+      {% with grades=author.grades.all %}
+        {% if grades %}
+          <div class="side-card__divider"></div>
+          <span class="eyebrow">В школьной программе</span>
+          <p>{% for grade in grades %}{{ grade.number }}{% if not forloop.last %}, {% endif %}{% endfor %} {% if grades|length > 1 %}классы{% else %}класс{% endif %}</p>
+        {% endif %}
+      {% endwith %}
+    </aside>
+  </div>
+
+  <section class="methodology" id="methodology">
+    <div class="section__head">
+      <div>
+        <div class="eyebrow">Для учителя</div>
+        <h2>Методическая разработка</h2>
+      </div>
+      <p>Текст и медиаматериалы открыты для всех. Скачивать аудио и видео могут зарегистрированные пользователи.</p>
+    </div>
+
+    <div class="two-columns">
+      <div class="prose">
+        {% if author.methodology %}
+          {{ author.methodology|linebreaks }}
+        {% else %}
+          <div class="placeholder">
+            <h3>Текст разработки готовится</h3>
+            <p>Здесь появится методическая разработка занятия по творчеству автора: цели, ход урока, вопросы для обсуждения и задания.</p>
+          </div>
+        {% endif %}
+      </div>
+      {% if author.research_question %}
+        <aside class="side-card">
+          <span class="eyebrow">Вопрос для исследования</span>
+          <p>{{ author.research_question }}</p>
+        </aside>
+      {% endif %}
+    </div>
+
+    <div class="materials" id="materials">
+      <h3>Аудио и видео</h3>
+      {% with materials=author.materials.all %}
+        {% if materials %}
+          <div class="material-grid">
+            {% for material in materials %}
+              <figure class="material">
+                {% if material.is_video %}
+                  <video controls playsinline preload="metadata" controlslist="nodownload" src="{% url 'material-stream' material.pk %}"></video>
+                {% else %}
+                  <audio controls preload="metadata" controlslist="nodownload" src="{% url 'material-stream' material.pk %}"></audio>
+                {% endif %}
+                <figcaption>
+                  <strong>{{ material.title }}</strong>
+                  {% if material.description %}<p>{{ material.description }}</p>{% endif %}
+                  {% if user.is_authenticated %}
+                    <a class="button-link button-link--small" href="{% url 'material-download' material.pk %}">Скачать <span aria-hidden="true">↓</span></a>
+                  {% else %}
+                    <p class="material__note">Скачивание доступно после <a href="{% url 'login' %}?next={{ request.path|urlencode }}%23materials">входа</a> или <a href="{% url 'register' %}?next={{ request.path|urlencode }}%23materials">регистрации</a>.</p>
+                  {% endif %}
+                </figcaption>
+              </figure>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="placeholder">
+            <p>Аудио- и видеоматериалы к разработке пока не добавлены.</p>
+          </div>
+        {% endif %}
+      {% endwith %}
+    </div>
+  </section>
+
+  <section class="related">
+    <div class="eyebrow">Продолжить знакомство</div>
+    <h2>Другие авторы проекта</h2>
+    <div class="related__links">
+      {% for other in other_authors %}
+        <a href="{{ other.get_absolute_url }}">{{ other.name }} <span aria-hidden="true">↗</span></a>
+      {% endfor %}
+      <a href="{% url 'home' %}#map">Литературная карта <span aria-hidden="true">↗</span></a>
+    </div>
+  </section>
+</main>
+{% endblock %}
