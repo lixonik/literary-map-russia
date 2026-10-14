@@ -1,6 +1,7 @@
 import io
 import shutil
 import tempfile
+from decimal import Decimal
 from pathlib import Path
 
 from django.conf import settings
@@ -66,6 +67,39 @@ class HomePageTests(TestCase):
 
         self.assertContains(response, 'data-grades="5 6"')
         self.assertContains(response, 'data-grade="11"')
+
+
+class FaviconTests(TestCase):
+    def test_favicon_ico_is_served(self):
+        response = self.client.get('/favicon.ico')
+
+        self.assertEqual(response.status_code, 301)
+        self.assertTrue(response['Location'].endswith('img/favicon.ico'))
+        self.assertTrue((Path(settings.BASE_DIR) / 'static' / 'img' / 'favicon.ico').is_file())
+
+    def test_pages_declare_png_icon_for_safari(self):
+        response = self.client.get(reverse('home'))
+
+        self.assertContains(response, 'rel="icon" href="/static/img/favicon.png" type="image/png"')
+        self.assertTrue((Path(settings.BASE_DIR) / 'static' / 'img' / 'favicon.png').is_file())
+
+
+class AuthorMapPointValidationTests(TestCase):
+    def setUp(self):
+        self.author = Author.objects.get(slug='karim')
+
+    def test_requires_both_coordinates(self):
+        for x, y, missing in ((Decimal('30'), None, 'map_y'), (None, Decimal('40'), 'map_x')):
+            self.author.map_x, self.author.map_y = x, y
+            with self.subTest(missing=missing), self.assertRaises(ValidationError) as caught:
+                self.author.full_clean()
+            self.assertIn(missing, caught.exception.message_dict)
+
+    def test_allows_both_or_neither(self):
+        for x, y in ((Decimal('30'), Decimal('40')), (None, None)):
+            self.author.map_x, self.author.map_y = x, y
+            with self.subTest(x=x, y=y):
+                self.author.full_clean()
 
 
 class AitmatovPlacementTests(TestCase):
@@ -135,13 +169,33 @@ class AuthorAttachmentsTests(TemporaryMediaMixin, TestCase):
         self.assertContains(response, 'Лист 1')
         self.assertNotContains(response, 'Рабочие листы к разработке пока не добавлены.')
 
+    def test_replacing_or_clearing_files_removes_old_ones(self):
+        self.author.portrait = png_upload('first.png')
+        self.author.methodology_file = SimpleUploadedFile('first.pdf', b'%PDF-1.4', content_type='application/pdf')
+        self.author.save()
+        worksheet = Worksheet.objects.create(author=self.author, image=png_upload('first-sheet.png'))
+        storage = self.author.portrait.storage
+        old_names = [self.author.portrait.name, self.author.methodology_file.name, worksheet.image.name]
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.author.portrait = png_upload('second.png')
+            self.author.methodology_file = None
+            self.author.save()
+            worksheet.image = png_upload('second-sheet.png')
+            worksheet.save()
+
+        self.assertFalse(any(storage.exists(name) for name in old_names))
+        self.assertTrue(storage.exists(self.author.portrait.name))
+        self.assertTrue(storage.exists(worksheet.image.name))
+
     def test_deleting_author_removes_files(self):
         self.author.portrait = png_upload('karim.png')
         self.author.save()
         worksheet = Worksheet.objects.create(author=self.author, image=png_upload('sheet.png'))
         storage, names = self.author.portrait.storage, [self.author.portrait.name, worksheet.image.name]
 
-        self.author.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.author.delete()
 
         self.assertFalse(any(storage.exists(name) for name in names))
 
@@ -294,12 +348,33 @@ class MaterialAccessTests(TemporaryMediaMixin, TestCase):
         self.assertNotContains(response, self.download_url)
         self.assertContains(response, 'Скачивание доступно после')
 
+    def test_admin_pages_render_uploaded_material_with_stream_link(self):
+        admin = get_user_model().objects.create_superuser('admin@example.com', 'test-pass-123', full_name='Админ')
+        self.client.force_login(admin)
+
+        author_page = self.client.get(reverse('admin:literature_author_change', args=[self.material.author.pk]))
+        material_page = self.client.get(reverse('admin:literature_material_change', args=[self.material.pk]))
+
+        for response in (author_page, material_page):
+            self.assertContains(response, f'href="{self.stream_url}"')
+
     def test_deleting_material_removes_file(self):
         storage, name = self.material.file.storage, self.material.file.name
 
-        self.material.delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.material.delete()
 
         self.assertFalse(storage.exists(name))
+
+    def test_replacing_material_file_removes_old_one(self):
+        storage, old_name = self.material.file.storage, self.material.file.name
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.material.file = SimpleUploadedFile('new.mp3', AUDIO_BYTES, content_type='audio/mpeg')
+            self.material.save()
+
+        self.assertFalse(storage.exists(old_name))
+        self.assertTrue(storage.exists(self.material.file.name))
 
     def test_missing_file_returns_404(self):
         self.material.file.storage.delete(self.material.file.name)

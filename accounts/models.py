@@ -1,6 +1,9 @@
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.db.models.functions import Lower
+
+DUPLICATE_EMAIL_MESSAGE = 'Пользователь с такой почтой уже зарегистрирован.'
 
 
 class UserManager(BaseUserManager):
@@ -34,7 +37,9 @@ class User(AbstractUser):
     username = None
     first_name = None
     last_name = None
-    email = models.EmailField('электронная почта', unique=True)
+    email = models.EmailField(
+        'электронная почта', unique=True, error_messages={'unique': DUPLICATE_EMAIL_MESSAGE}
+    )
     full_name = models.CharField('ФИО', max_length=255)
     workplace = models.CharField('место работы', max_length=255, blank=True)
     research_interests = models.TextField('сферы научных интересов', blank=True)
@@ -47,9 +52,20 @@ class User(AbstractUser):
     class Meta:
         verbose_name = 'пользователь'
         verbose_name_plural = 'пользователи'
+        constraints = [
+            models.UniqueConstraint(
+                Lower('email'),
+                name='unique_user_email_case_insensitive',
+                violation_error_message=DUPLICATE_EMAIL_MESSAGE,
+            ),
+        ]
 
     def __str__(self):
         return self.full_name or self.email
+
+    def clean(self):
+        super().clean()
+        self.email = self.email.lower()
 
     def get_full_name(self):
         return self.full_name

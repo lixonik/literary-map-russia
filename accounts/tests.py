@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 
@@ -95,6 +96,32 @@ class LoginTests(TestCase):
         self.assertRedirects(response, reverse('home'))
         self.assertNotIn('_auth_user_id', self.client.session)
 
+    def test_logout_returns_to_current_page(self):
+        author_url = reverse('author', kwargs={'slug': 'tukay'})
+        self.client.login(username='teacher@example.com', password='long-unique-pass-42')
+
+        page = self.client.get(author_url)
+        response = self.client.post(reverse('logout'), {'next': author_url})
+
+        self.assertContains(page, f'<input type="hidden" name="next" value="{author_url}">', html=True)
+        self.assertRedirects(response, author_url)
+
+
+class EmailUniquenessTests(TestCase):
+    def test_email_is_lowercased_on_clean(self):
+        user = User(email='Mixed.Case@Example.COM', full_name='Учитель')
+        user.set_password('long-unique-pass-42')
+
+        user.full_clean()
+
+        self.assertEqual(user.email, 'mixed.case@example.com')
+
+    def test_database_rejects_case_insensitive_duplicates(self):
+        User.objects.create_user('teacher@example.com', 'long-unique-pass-42', full_name='Учитель')
+
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            User.objects.create(email='Teacher@example.com', full_name='Дубль')
+
 
 class AdminTests(TestCase):
     def setUp(self):
@@ -121,3 +148,56 @@ class AdminTests(TestCase):
         self.assertEqual(map_x.clean('18,5'), Decimal('18.5'))
         self.assertEqual(map_x.clean('18.5'), Decimal('18.5'))
         self.assertContains(response, 'name="map_x" value="18,73"')
+
+    def add_user(self, email):
+        return self.client.post(reverse('admin:accounts_user_add'), {
+            'email': email,
+            'full_name': 'Второй администратор',
+            'usable_password': 'true',
+            'password1': 'long-unique-pass-42',
+            'password2': 'long-unique-pass-42',
+        })
+
+    def test_admin_add_user_stores_lowercase_email(self):
+        self.add_user('Second.Admin@Example.com')
+
+        self.assertTrue(User.objects.filter(email='second.admin@example.com').exists())
+
+    def test_admin_rejects_duplicate_email_in_other_case(self):
+        self.add_user('second@example.com')
+
+        response = self.add_user('SECOND@example.com')
+
+        self.assertEqual(User.objects.filter(email__iexact='second@example.com').count(), 1)
+        self.assertEqual(
+            response.context['adminform'].form.errors,
+            {'email': ['Пользователь с такой почтой уже зарегистрирован.']},
+        )
+
+    def test_admin_change_rejects_email_of_another_user(self):
+        self.add_user('second@example.com')
+        second = User.objects.get(email='second@example.com')
+        page = self.client.get(reverse('admin:accounts_user_change', args=[second.pk]))
+        form = page.context['adminform'].form
+
+        data = {name: value for name, value in form.initial.items() if value is not None and name != 'password'}
+        data.update({'email': 'ADMIN@example.com', 'groups': [], 'user_permissions': [], 'is_active': 'on'})
+        data['date_joined_0'], data['date_joined_1'] = '01.01.2026', '00:00:00'
+        response = self.client.post(reverse('admin:accounts_user_change', args=[second.pk]), data)
+
+        second.refresh_from_db()
+        self.assertEqual(second.email, 'second@example.com')
+        self.assertEqual(
+            response.context['adminform'].form.errors['email'],
+            ['Пользователь с такой почтой уже зарегистрирован.'],
+        )
+
+    def test_login_works_for_admin_created_user(self):
+        self.add_user('Second.Admin@Example.com')
+        self.client.logout()
+
+        response = self.client.post(
+            reverse('login'), {'username': 'second.admin@example.com', 'password': 'long-unique-pass-42'}
+        )
+
+        self.assertRedirects(response, reverse('home'))

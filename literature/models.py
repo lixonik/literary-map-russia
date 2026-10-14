@@ -2,9 +2,8 @@ from pathlib import Path
 
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator, MaxValueValidator, MinValueValidator
-from django.db import models
-from django.db.models.signals import post_delete
-from django.dispatch import receiver
+from django.db import models, transaction
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.urls import reverse
 from django.utils.text import get_valid_filename
 
@@ -26,13 +25,6 @@ MATERIAL_CONTENT_TYPES = {
 METHODOLOGY_FILE_EXTENSIONS = ['pdf', 'doc', 'docx', 'odt', 'rtf', 'ppt', 'pptx']
 
 PERCENT_VALIDATORS = [MinValueValidator(0), MaxValueValidator(100)]
-
-
-def delete_stored_files(instance, *field_names):
-    for field_name in field_names:
-        stored_file = getattr(instance, field_name)
-        if stored_file:
-            stored_file.delete(save=False)
 
 
 class Grade(models.Model):
@@ -112,6 +104,12 @@ class Author(models.Model):
 
     def get_absolute_url(self):
         return reverse('author', kwargs={'slug': self.slug})
+
+    def clean(self):
+        super().clean()
+        if (self.map_x is None) != (self.map_y is None):
+            missing = 'map_y' if self.map_y is None else 'map_x'
+            raise ValidationError({missing: 'Укажите обе координаты точки или оставьте обе пустыми.'})
 
     @property
     def on_map(self):
@@ -220,16 +218,43 @@ class Material(models.Model):
         return get_valid_filename(f'{self.title}.{self.extension}')
 
 
-@receiver(post_delete, sender=Author)
-def delete_author_files(sender, instance, **kwargs):
-    delete_stored_files(instance, 'portrait', 'methodology_file')
+FILE_FIELDS = {
+    Author: ('portrait', 'methodology_file'),
+    Worksheet: ('image',),
+    Material: ('file',),
+}
 
 
-@receiver(post_delete, sender=Worksheet)
-def delete_worksheet_image(sender, instance, **kwargs):
-    delete_stored_files(instance, 'image')
+def delete_on_commit(storage, name):
+    transaction.on_commit(lambda: storage.delete(name))
 
 
-@receiver(post_delete, sender=Material)
-def delete_material_file(sender, instance, **kwargs):
-    delete_stored_files(instance, 'file')
+def remember_replaced_files(sender, instance, **kwargs):
+    if instance._state.adding:
+        return
+    fields = FILE_FIELDS[sender]
+    previous = sender.objects.filter(pk=instance.pk).values(*fields).first() or {}
+    instance._replaced_files = [
+        (getattr(instance, field).storage, previous[field])
+        for field in fields
+        if previous.get(field) and previous[field] != getattr(instance, field).name
+    ]
+
+
+def delete_replaced_files(sender, instance, **kwargs):
+    for storage, name in getattr(instance, '_replaced_files', []):
+        delete_on_commit(storage, name)
+    instance._replaced_files = []
+
+
+def delete_files_of_deleted(sender, instance, **kwargs):
+    for field in FILE_FIELDS[sender]:
+        stored_file = getattr(instance, field)
+        if stored_file:
+            delete_on_commit(stored_file.storage, stored_file.name)
+
+
+for model in FILE_FIELDS:
+    pre_save.connect(remember_replaced_files, sender=model, dispatch_uid=f'remember_files_{model.__name__}')
+    post_save.connect(delete_replaced_files, sender=model, dispatch_uid=f'replace_files_{model.__name__}')
+    post_delete.connect(delete_files_of_deleted, sender=model, dispatch_uid=f'delete_files_{model.__name__}')
