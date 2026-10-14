@@ -1,18 +1,20 @@
-# Литературная карта народов России
+# Literary Map of the Peoples of Russia
 
-Сайт-навигатор на Django для учителей-словесников, школьников и студентов-филологов: интерактивная карта авторов литературы народов России, страницы авторов и методические разработки с аудио- и видеоматериалами.
+**English** | [Русский](README.ru.md)
 
-## Что умеет сайт
+A Django navigator site for literature teachers, school students and philology students: an interactive map of writers from the peoples of Russia, author pages, and lesson plans with audio and video materials. The site interface is in Russian.
 
-- **Главная страница**: карта с точками авторов, карточки авторов, методический конструктор и блок «Литература по классам». Выбор класса оставляет на карте и в списке только авторов, которых изучают в этом классе.
-- **Страница автора**: ФИО, даты жизни, место рождения, литературная традиция, биография, ключевые произведения и раздел «Методическая разработка» (текст плюс аудио и видео). Пока текст разработки не заполнен, на странице показывается заготовка раздела.
-- **Доступ к материалам**: аудио и видео воспроизводятся у всех посетителей, скачивание доступно только зарегистрированным пользователям.
-- **Регистрация**: ФИО, электронная почта, место работы, сферы научных интересов и пароль. Вход выполняется по электронной почте.
-- **Админка** `/admin/`: всё содержимое сайта редактируется без правки кода.
+## Features
 
-## Запуск
+- **Home page**: a map with author points, author cards, a lesson-plan toolkit and a "Literature by grade" block. Selecting a grade keeps only the authors studied in that grade on the map and in the list.
+- **Author page**: full name, life dates, birthplace, literary tradition, biography, key works and a "Lesson plan" section (text plus audio and video). Until the lesson-plan text is filled in, the page shows a placeholder for the section.
+- **Access to materials**: everyone can play audio and video, only registered users can download them.
+- **Registration**: full name, email, workplace, research interests and password. Users sign in with their email.
+- **Admin** at `/admin/`: all site content is edited without touching the code.
 
-Нужен Python 3.10 или новее.
+## Getting started
+
+Python 3.10 or newer is required.
 
 ```bash
 python -m venv .venv
@@ -24,86 +26,86 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
-На Windows виртуальное окружение активируется командой `.venv\Scripts\activate`, а файл копируется командой `copy .env.example .env`.
+On Windows, activate the virtual environment with `.venv\Scripts\activate` and copy the file with `copy .env.example .env`.
 
-Сайт откроется на http://127.0.0.1:8000/, админка на http://127.0.0.1:8000/admin/.
+The site opens at http://127.0.0.1:8000/, the admin at http://127.0.0.1:8000/admin/.
 
-Команда `migrate` сразу создаёт 10 авторов и классы с 1 по 11, поэтому сайт после неё не пустой.
+`migrate` creates 10 authors and grades 1 to 11 right away, so the site is not empty afterwards.
 
-В `.env` впишите секретный ключ. Сгенерировать его можно так:
+Put a secret key into `.env`. You can generate one like this:
 
 ```bash
 python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 ```
 
-Без ключа сайт запускается только в режиме разработки (`DJANGO_DEBUG=1`).
+Without a key the site starts only in development mode (`DJANGO_DEBUG=1`).
 
-Тесты:
+Tests:
 
 ```bash
 python manage.py test
 ```
 
-## Вход в админку
+## Admin access
 
-### Создать администратора
+### Create an administrator
 
-Выполните в каталоге проекта с активированным виртуальным окружением:
+Run this in the project directory with the virtual environment activated:
 
 ```bash
 python manage.py createsuperuser
 ```
 
-Команда по очереди спросит:
+The command asks for, in order:
 
-- **электронную почту**: она будет логином;
-- **ФИО**;
-- **пароль** дважды. Символы при вводе пароля не отображаются, это нормально.
+- **email**: it is used as the login;
+- **full name** (prompted as «ФИО»);
+- **password**, twice. Characters are not shown while you type the password, this is expected.
 
-Если пароль слишком короткий или простой, Django предупредит и спросит, создать ли пользователя всё равно: ответ `y` создаст. На сервере, доступном из интернета, используйте надёжный пароль.
+If the password is too short or too common, Django warns and asks whether to create the user anyway: answering `y` creates it. Use a strong password on a server reachable from the internet.
 
-### Войти
+### Sign in
 
-1. Запустите сайт командой `python manage.py runserver`.
-2. Откройте http://127.0.0.1:8000/admin/ (на сервере: `https://<ваш домен>/admin/`).
-3. Введите почту и пароль администратора. Регистр букв в почте не важен.
+1. Start the site with `python manage.py runserver`.
+2. Open http://127.0.0.1:8000/admin/ (on a server: `https://<your domain>/admin/`).
+3. Enter the administrator's email and password. Email letter case does not matter.
 
-Кнопка «Войти» в шапке сайта тоже авторизует администратора, но возвращает на сайт. В админку попадают только по адресу `/admin/`.
+The «Войти» (Sign in) button in the site header also signs the administrator in, but it returns to the site. The admin is reachable only at `/admin/`.
 
-### Другие администраторы и смена пароля
+### More administrators and password changes
 
-- **Сделать администратором** зарегистрированного пользователя: в админке откройте **Пользователи**, выберите пользователя, отметьте «Статус персонала» (даёт вход в админку) и «Статус суперпользователя» (даёт все права), затем нажмите «Сохранить». Вместо суперпользователя можно выдать отдельные права в поле «Права пользователя».
-- **Сменить пароль**, в том числе забытый, можно командой ниже. Почту указывайте строчными буквами, как она сохранена в базе:
+- **Make a registered user an administrator**: in the admin open **Пользователи** (Users), select the user, tick «Статус персонала» (Staff status, grants admin access) and «Статус суперпользователя» (Superuser status, grants all permissions), then click «Сохранить» (Save). Instead of superuser status you can grant individual permissions in the «Права пользователя» (User permissions) field.
+- **Change a password**, including a forgotten one, with the command below. Type the email in lowercase, as it is stored in the database:
 
 ```bash
 python manage.py changepassword admin@example.com
 ```
 
-## Наполнение через админку
+## Editing content in the admin
 
-Раздел **Авторы**:
+The **Авторы** (Authors) section:
 
-- **Методическая разработка**: поле «текст методической разработки». Абзацы разделяются пустой строкой.
-- **Аудио и видео**: добавляются внизу карточки автора. Поддерживаются форматы mp3, m4a, aac, wav, ogg (аудио) и mp4, m4v, mov, webm (видео). Для Safari лучше всего подходят mp4 и mp3.
-- **Классы**: галочки в поле «изучается в классах» управляют фильтром на главной.
-- **Точка на карте**: X и Y задают отступ от левого и верхнего края контура России в процентах, «сторона подписи» указывает, где стоит подпись. Если X и Y пустые, автор показывается только в списке.
-- **Порядок**: число определяет порядок карточек и их номер на главной.
+- **Lesson plan**: the «текст методической разработки» (lesson plan text) field. Separate paragraphs with a blank line.
+- **Audio and video**: added at the bottom of the author form. Supported formats are mp3, m4a, aac, wav, ogg (audio) and mp4, m4v, mov, webm (video). mp4 and mp3 work best in Safari.
+- **Grades**: the checkboxes in the «изучается в классах» (studied in grades) field drive the filter on the home page.
+- **Map point**: X and Y set the offset from the left and top edges of the Russia outline in percent, «сторона подписи» (label side) sets where the label is placed. If X and Y are empty, the author appears only in the list.
+- **Order**: the number sets the order of the cards and their number on the home page.
 
-## Структура
+## Structure
 
 ```
-config/       настройки, маршруты
-accounts/     пользователь с входом по почте, регистрация
-literature/   авторы, произведения, классы, материалы, отдача медиафайлов
-templates/    шаблоны страниц
-static/       стили, скрипт фильтра по классам, контур карты, логотип
+config/       settings, URL routing
+accounts/     user model with email login, registration
+literature/   authors, works, grades, materials, media file delivery
+templates/    page templates
+static/       styles, grade filter script, map outline, logo
 ```
 
-## Технические заметки
+## Technical notes
 
-- Загруженные материалы хранятся в каталоге `media/`. Отдаются они только через приложение: `/materials/<id>/` для воспроизведения (с поддержкой HTTP Range, без неё Safari не воспроизводит видео) и `/materials/<id>/download/` для скачивания после входа. Не публикуйте `media/` веб-сервером напрямую, иначе запрет на скачивание можно обойти.
-- Запрет на скачивание реализован через интерфейс и права на ссылку скачивания. Файл, который браузер воспроизводит, технически можно сохранить сторонними средствами. Полную защиту даёт только потоковое шифрование (DRM), для учебного сайта это избыточно.
-- Даты и места рождения авторов сверены с русской Википедией. Привязка к 5 и 6 классам взята из федеральной рабочей программы по литературе (раздел «Литература народов Российской Федерации»). Для остальных классов авторы пока не отмечены.
-- Точки на карте перенесены из исходного макета и расставлены схематично, чтобы подписи не перекрывались. Географически часть точек смещена (сильнее всего Карим, Шесталов, Тукай и Айги). Координаты правятся в админке.
-- Контур России построен по данным [Natural Earth](https://www.naturalearthdata.com/) (общественное достояние).
-- Для публикации на сервере: `DJANGO_DEBUG=0`, свой `DJANGO_SECRET_KEY`, домен в `DJANGO_ALLOWED_HOSTS`, затем `python manage.py collectstatic`.
+- Uploaded materials are stored in the `media/` directory. They are served only through the application: `/materials/<id>/` for playback (with HTTP Range support, without which Safari does not play video) and `/materials/<id>/download/` for downloads after signing in. Do not publish `media/` directly through the web server, otherwise the download restriction can be bypassed.
+- The download restriction is enforced by the interface and by permissions on the download link. A file that the browser plays can technically be saved with third-party tools. Only encrypted streaming (DRM) gives full protection, which is excessive for an educational site.
+- Authors' dates and birthplaces were checked against the Russian Wikipedia. The links to grades 5 and 6 come from the federal working program for literature (the "Literature of the peoples of the Russian Federation" section). No authors are assigned to other grades yet.
+- Map points were taken from the original mockup and placed schematically so that labels do not overlap. Some points are geographically off (Karim, Shestalov, Tukay and Aigi the most). Coordinates can be edited in the admin.
+- The Russia outline is built from [Natural Earth](https://www.naturalearthdata.com/) data (public domain).
+- For deployment: `DJANGO_DEBUG=0`, your own `DJANGO_SECRET_KEY`, the domain in `DJANGO_ALLOWED_HOSTS`, then `python manage.py collectstatic`.
